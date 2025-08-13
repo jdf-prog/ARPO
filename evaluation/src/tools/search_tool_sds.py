@@ -23,7 +23,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ..vllm_client_pool import VLLMClientPool
 from .cache_manager import BaseCacheManager
-from .search_tool import BingSearchTool
 
 
 headers = {
