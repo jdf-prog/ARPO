@@ -1,7 +1,8 @@
 import datasets
 import json
 dataset_names = ["webwalker", "xbench", "bamboogle", "2wiki", "hotpotqa", "musique", "SimpleQA", "hle", "gaia"]
-prompt_type = ["code_search_cn", "code_search_cn", "code_search", "code_search", "code_search", "code_search", "code_search"]
+prompt_type = ["code_search"] * len(dataset_names)
+prompt_type[0:2] = ["code_search_cn", "code_search_cn"]  # webwalker and xbench use Chinese prompts
 
 code_search_prompt = """You are a helpful assistant that can solve the given question step by step with the help of the wikipedia search tool and python interpreter tool. \
 Given a question, you need to first think about the reasoning process in the mind and then provide the answer. \
@@ -36,6 +37,7 @@ def process_train_item(item, index):
             "ground_truth": [answer] if isinstance(answer, str) else answer,
         },
         "extra_info": item['extra_info'],
+        "metadata": ""
     }
 processed_train_dataset = train_dataset.map(
     process_train_item,
@@ -54,6 +56,15 @@ for dataset_name, prompt_type in zip(dataset_names, prompt_type):
     dataset = datasets.Dataset.from_list(data)
     
     def process_item(item, index):
+        metadata = {k: v for k, v in item.items() if k not in ['question', 'answer']}
+        metadata = json.dumps(metadata, ensure_ascii=False)
+        if 'question' in item:
+            question = item['question']
+        elif 'Question' in item:
+            question = item['Question']
+        else:
+            raise KeyError("Neither 'question' nor 'Question' found in item, item.keys() = {}".format(item.keys()))
+        answer = item['answer']
         return {
             "data_source": dataset_name,
             "prompt": [
@@ -63,18 +74,19 @@ for dataset_name, prompt_type in zip(dataset_names, prompt_type):
                 },
                 {
                     "role": "user",
-                    "content": item['question']
+                    "content": question
                 }
             ],
             "ability": "code_search",
             "reward_model": {
-                "ground_truth": [item['answer']] if isinstance(item['answer'], str) else item['answer'],
+                "ground_truth": [answer] if isinstance(answer, str) else answer,
             },
             "extra_info": {
                 "index": index,
-                "question": item['question'],
+                "question": question,
                 "split": "test",
             },
+            "metadata": metadata,
         }
     processed_dataset = dataset.map(
         process_item,
